@@ -1,0 +1,151 @@
+name: Build Multi-Platform Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller yt-dlp
+
+    - name: Download FFmpeg
+      run: |
+        curl -L https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip -o ffmpeg.zip
+        7z x ffmpeg.zip
+        mkdir ffmpeg\bin
+        move ffmpeg-*\bin\*.exe ffmpeg\bin\
+        move ffmpeg-*\bin\*.dll ffmpeg\bin\
+
+    - name: Build with PyInstaller
+      run: pyinstaller yt_dlp_ui.spec
+
+    - name: Create portable package
+      run: |
+        mkdir yt-dlp-ui-windows
+        copy dist\yt-dlp-ui.exe yt-dlp-ui-windows\
+        xcopy /E /I ffmpeg yt-dlp-ui-windows\ffmpeg
+        copy FFMPEG_LICENSE.txt yt-dlp-ui-windows\
+        copy LICENSE yt-dlp-ui-windows\LICENSE.txt
+        echo Quick Start: Run yt-dlp-ui.exe > yt-dlp-ui-windows\README.txt
+
+    - name: Create ZIP
+      run: |
+        powershell Compress-Archive -Path yt-dlp-ui-windows -DestinationPath yt-dlp-ui-windows-${{ github.event.release.tag_name }}.zip
+
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: yt-dlp-ui-windows-${{ github.event.release.tag_name }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller yt-dlp
+
+    - name: Download FFmpeg
+      run: |
+        brew install ffmpeg
+        mkdir -p ffmpeg/bin
+        cp $(which ffmpeg) ffmpeg/bin/
+        cp $(which ffprobe) ffmpeg/bin/
+
+    - name: Build with PyInstaller
+      run: pyinstaller yt_dlp_ui.spec
+
+    - name: Create portable package
+      run: |
+        mkdir yt-dlp-ui-macos
+        cp -r dist/yt-dlp-ui.app yt-dlp-ui-macos/ || cp dist/yt-dlp-ui yt-dlp-ui-macos/
+        cp -r ffmpeg yt-dlp-ui-macos/
+        cp FFMPEG_LICENSE.txt yt-dlp-ui-macos/
+        cp LICENSE yt-dlp-ui-macos/LICENSE.txt
+        echo "Quick Start: Run yt-dlp-ui" > yt-dlp-ui-macos/README.txt
+
+    - name: Create ZIP
+      run: |
+        zip -r yt-dlp-ui-macos-${{ github.event.release.tag_name }}.zip yt-dlp-ui-macos
+
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: yt-dlp-ui-macos-${{ github.event.release.tag_name }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller yt-dlp
+        sudo apt-get update
+        sudo apt-get install -y python3-tk
+
+    - name: Download FFmpeg
+      run: |
+        sudo apt-get install -y ffmpeg
+        mkdir -p ffmpeg/bin
+        cp $(which ffmpeg) ffmpeg/bin/
+        cp $(which ffprobe) ffmpeg/bin/
+
+    - name: Build with PyInstaller
+      run: pyinstaller yt_dlp_ui.spec
+
+    - name: Create portable package
+      run: |
+        mkdir yt-dlp-ui-linux
+        cp dist/yt-dlp-ui yt-dlp-ui-linux/
+        cp -r ffmpeg yt-dlp-ui-linux/
+        cp FFMPEG_LICENSE.txt yt-dlp-ui-linux/
+        cp LICENSE yt-dlp-ui-linux/LICENSE.txt
+        echo "Quick Start: Run ./yt-dlp-ui" > yt-dlp-ui-linux/README.txt
+        chmod +x yt-dlp-ui-linux/yt-dlp-ui
+
+    - name: Create ZIP
+      run: |
+        zip -r yt-dlp-ui-linux-${{ github.event.release.tag_name }}.zip yt-dlp-ui-linux
+
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: yt-dlp-ui-linux-${{ github.event.release.tag_name }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,17 +1,41 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for yt-dlp UI
 # Build with: pyinstaller yt_dlp_ui.spec
+# Cross-platform: Works on Windows, macOS, and Linux
+
+import sys
+import os
 
 block_cipher = None
+
+# Platform-specific ffmpeg binaries
+binaries = []
+if sys.platform == 'win32':
+    # Windows: ffmpeg.exe and ffprobe.exe
+    if os.path.exists('ffmpeg/bin/ffmpeg.exe'):
+        binaries.extend([
+            ('ffmpeg/bin/ffmpeg.exe', 'ffmpeg/bin'),
+            ('ffmpeg/bin/ffprobe.exe', 'ffmpeg/bin'),
+        ])
+elif sys.platform == 'darwin':
+    # macOS: ffmpeg and ffprobe binaries
+    if os.path.exists('ffmpeg/bin/ffmpeg'):
+        binaries.extend([
+            ('ffmpeg/bin/ffmpeg', 'ffmpeg/bin'),
+            ('ffmpeg/bin/ffprobe', 'ffmpeg/bin'),
+        ])
+else:
+    # Linux: ffmpeg and ffprobe binaries
+    if os.path.exists('ffmpeg/bin/ffmpeg'):
+        binaries.extend([
+            ('ffmpeg/bin/ffmpeg', 'ffmpeg/bin'),
+            ('ffmpeg/bin/ffprobe', 'ffmpeg/bin'),
+        ])
 
 a = Analysis(
     ['yt_dlp_ui.py'],
     pathex=[],
-    binaries=[
-        # Bundle ffmpeg binaries (update path after downloading ffmpeg)
-        ('ffmpeg/bin/ffmpeg.exe', 'ffmpeg/bin'),
-        ('ffmpeg/bin/ffprobe.exe', 'ffmpeg/bin'),
-    ],
+    binaries=binaries,
     datas=[],
     hiddenimports=['yt_dlp'],
     hookspath=[],
