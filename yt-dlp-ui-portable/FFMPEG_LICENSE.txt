@@ -1,0 +1,34 @@
+FFmpeg License Information
+==========================
+
+This software uses FFmpeg (https://ffmpeg.org/) which is licensed under
+the GNU Lesser General Public License (LGPL) version 2.1 or later.
+
+The portable version of this application includes FFmpeg binaries.
+
+LGPL 2.1 License Summary:
+-------------------------
+FFmpeg is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the
+Free Software Foundation; either version 2.1 of the License, or (at your
+option) any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+License for more details.
+
+Full LGPL 2.1 License:
+---------------------
+The complete text of the LGPL 2.1 license can be found at:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+FFmpeg Source Code:
+------------------
+The source code for FFmpeg is available at:
+https://ffmpeg.org/download.html
+
+FFmpeg is a trademark of Fabrice Bellard, originator of the FFmpeg project.
+
+For more information about FFmpeg licensing, visit:
+https://ffmpeg.org/legal.html
