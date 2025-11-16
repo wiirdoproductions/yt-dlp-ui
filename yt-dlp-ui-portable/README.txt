@@ -1,5 +1,12 @@
-yt-dlp UI - Portable Version v1.0.0
+yt-dlp UI - Portable Version v1.0.2
 ====================================
+
+WHAT'S NEW in v1.0.2
+--------------------
+CRITICAL BUG FIX: Download button no longer spawns multiple app instances.
+Previous versions had a bug where clicking DOWNLOAD would open new windows
+instead of downloading. This has been fixed. All users should update!
+
 
 QUICK START
 -----------
