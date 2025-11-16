@@ -90,7 +90,7 @@ jobs:
         cp -r ffmpeg yt-dlp-ui-macos/
         cp FFMPEG_LICENSE.txt yt-dlp-ui-macos/
         cp LICENSE yt-dlp-ui-macos/LICENSE.txt
-        echo "Quick Start: Run yt-dlp-ui" > yt-dlp-ui-macos/README.txt
+        cp README_MACOS.txt yt-dlp-ui-macos/README.txt
 
     - name: Create ZIP
       run: |
@@ -139,7 +139,7 @@ jobs:
         cp -r ffmpeg yt-dlp-ui-linux/
         cp FFMPEG_LICENSE.txt yt-dlp-ui-linux/
         cp LICENSE yt-dlp-ui-linux/LICENSE.txt
-        echo "Quick Start: Run ./yt-dlp-ui" > yt-dlp-ui-linux/README.txt
+        cp README_LINUX.txt yt-dlp-ui-linux/README.txt
         chmod +x yt-dlp-ui-linux/yt-dlp-ui
 
     - name: Create ZIP
