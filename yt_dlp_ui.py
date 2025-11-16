@@ -584,5 +584,10 @@ class TrainerUI(tk.Tk):
 
 
 if __name__ == '__main__':
+    # Critical for PyInstaller on Windows: prevents spawning new instances
+    # when subprocess is used in frozen executable
+    import multiprocessing
+    multiprocessing.freeze_support()
+
     app = TrainerUI()
     app.mainloop()
