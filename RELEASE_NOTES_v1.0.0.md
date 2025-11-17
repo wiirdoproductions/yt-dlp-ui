@@ -74,7 +74,13 @@ A modern, user-friendly graphical interface for yt-dlp, the powerful video downl
 ### Critical Fix
 - **FIXED**: Download button no longer spawns multiple application instances
   - Previous version had a critical bug where clicking DOWNLOAD in the .exe would open additional windows instead of downloading
-  - This has been resolved by adding proper multiprocessing support for frozen executables
+  - This has been completely resolved by refactoring to use yt-dlp's Python API instead of subprocess
+  - All users of v1.0.0 and v1.0.1 should update immediately
+
+### Improvements
+- Better download progress reporting with real-time updates
+- Enhanced error handling and logging
+- More reliable and maintainable codebase
 
 ## 🐛 Known Issues
 
