@@ -6,6 +6,7 @@ import shutil
 import os
 import sys
 import queue
+import yt_dlp
 
 # Retro style single-window yt-dlp + FFmpeg frontend for Windows
 # - Compact, all controls visible in one window
@@ -76,7 +77,7 @@ class TrainerUI(tk.Tk):
         self.create_variables()
         self.create_widgets()
         self.ffmpeg_path_var.set(detect_ffmpeg())
-        self.process = None
+        self.download_thread = None
         self.stop_requested = False
         self.after(100, self._poll_log_queue)
 
@@ -421,43 +422,49 @@ class TrainerUI(tk.Tk):
         self.cmd_preview.insert(tk.END, ' '.join(cmd))
         self.cmd_preview.configure(state='disabled')
 
-    def build_command(self, dry_run=False):
+    def build_ytdlp_opts(self):
+        """Build yt-dlp options dictionary for Python API"""
         url = self.url_var.get().strip()
         batch_file = self.batch_file_var.get().strip()
 
-        if not url and not batch_file and not dry_run:
-            messagebox.showwarning('No URL or Batch File', 'Please enter a URL or select a batch file.')
-            return []
-
-        cmd = [sys.executable, '-m', 'yt_dlp']
+        if not url and not batch_file:
+            return None, None
 
         # output template and folder
         dest = self.dest_folder_var.get()
         if not dest:
             dest = os.path.expanduser('~')
         out = os.path.join(dest, self.output_template_var.get())
-        cmd += ['-o', out]
+
+        ydl_opts = {
+            'outtmpl': out,
+            'quiet': False,
+            'no_warnings': False,
+        }
 
         # format handling
         fmt_choice = self.format_choice.get()
         if fmt_choice == 'best':
-            cmd += ['-f', 'bestvideo+bestaudio/best']
+            ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif fmt_choice == 'audio':
-            cmd += ['-f', 'bestaudio']
+            ydl_opts['format'] = 'bestaudio'
         elif fmt_choice == 'custom':
             custom_fmt = self.custom_format_var.get().strip()
             if custom_fmt:
-                cmd += ['-f', custom_fmt]
+                ydl_opts['format'] = custom_fmt
 
         # audio extraction
         if self.audio_extract_var.get():
-            cmd += ['-x', '--audio-format', self.audio_format_var.get()]
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': self.audio_format_var.get(),
+            }]
             if self.audio_bitrate_var.get():
-                cmd += ['--audio-quality', self.audio_bitrate_var.get()]
+                ydl_opts['postprocessors'][0]['preferredquality'] = self.audio_bitrate_var.get()
 
         # playlist options
         if self.playlist_var.get() == 'off':
-            cmd += ['--no-playlist']
+            ydl_opts['noplaylist'] = True
         else:
             # playlist is on
             episodes = self.playlist_episodes_var.get().strip()
@@ -465,122 +472,192 @@ class TrainerUI(tk.Tk):
             range_end = self.playlist_range_end_var.get().strip()
 
             if episodes:
-                # Specific episodes specified (e.g., "1,3,5" or "1,3-5,7")
-                cmd += ['--playlist-items', episodes]
+                ydl_opts['playlist_items'] = episodes
             elif range_start and range_end:
-                # Range specified - use range values
-                cmd += ['--playlist-items', f'{range_start}-{range_end}']
+                ydl_opts['playlist_items'] = f'{range_start}-{range_end}'
             elif range_start:
-                # Only start specified - from start to end of playlist
-                cmd += ['--playlist-items', f'{range_start}-']
+                ydl_opts['playlist_items'] = f'{range_start}-'
             elif self.playlist_items_var.get() == 'recent':
-                # Recent option selected
-                cmd += ['--playlist-items', '1']
-            # if 'all' and no range, no additional flag needed (default behavior)
+                ydl_opts['playlist_items'] = '1'
 
         # subtitles
         if self.subtitles_var.get():
-            cmd += ['--write-sub', '--sub-lang', self.subtitle_lang_var.get()]
+            ydl_opts['writesubtitles'] = True
+            ydl_opts['subtitleslangs'] = [self.subtitle_lang_var.get()]
 
         # embedding and metadata
         if self.embed_thumbnail_var.get():
-            cmd += ['--embed-thumbnail']
+            ydl_opts['writethumbnail'] = True
+            ydl_opts['embedthumbnail'] = True
         if self.add_metadata_var.get():
-            cmd += ['--add-metadata']
+            ydl_opts['addmetadata'] = True
 
         # authentication
         if self.username_var.get().strip():
-            cmd += ['--username', self.username_var.get().strip()]
+            ydl_opts['username'] = self.username_var.get().strip()
         if self.password_var.get().strip():
-            cmd += ['--password', self.password_var.get().strip()]
+            ydl_opts['password'] = self.password_var.get().strip()
 
         # network
         if self.rate_limit_var.get().strip():
-            cmd += ['--limit-rate', self.rate_limit_var.get().strip()]
+            ydl_opts['ratelimit'] = self.rate_limit_var.get().strip()
         if self.retries_var.get().strip():
-            cmd += ['--retries', self.retries_var.get().strip()]
+            ydl_opts['retries'] = int(self.retries_var.get().strip())
         if self.cookies_var.get().strip():
-            cmd += ['--cookies', self.cookies_var.get().strip()]
+            ydl_opts['cookiefile'] = self.cookies_var.get().strip()
         if self.proxy_var.get().strip():
-            cmd += ['--proxy', self.proxy_var.get().strip()]
+            ydl_opts['proxy'] = self.proxy_var.get().strip()
 
         # merging preferences
         if self.merge_method_var.get() == 'ffmpeg':
-            # prefer ffmpeg merging
-            # if user wants reencode, set args accordingly (handled by ffmpeg during postprocessing)
-            cmd += ['--merge-output-format', 'mp4']
+            ydl_opts['merge_output_format'] = 'mp4'
 
-        # extra args (free text)
-        extra = self.extra_args_var.get().strip()
-        if extra:
-            cmd += extra.split()
+        # FFmpeg location
+        ffmpeg_path = self.ffmpeg_path_var.get().strip()
+        if ffmpeg_path and os.path.isfile(ffmpeg_path):
+            ydl_opts['ffmpeg_location'] = os.path.dirname(ffmpeg_path)
 
-        # batch file or URL
+        # Determine URLs
+        urls = []
         if batch_file:
-            cmd += ['-a', batch_file]
+            try:
+                with open(batch_file, 'r') as f:
+                    urls = [line.strip() for line in f if line.strip()]
+            except Exception as e:
+                log_q.put(f'[ERROR] Failed to read batch file: {e}\n')
+                return None, None
         elif url:
-            cmd += [url]
+            urls = [url]
+
+        return ydl_opts, urls
+
+    def build_command(self, dry_run=False):
+        """Build command string for preview (for display purposes only)"""
+        ydl_opts, urls = self.build_ytdlp_opts()
+        if not ydl_opts or not urls:
+            if not dry_run:
+                messagebox.showwarning('No URL or Batch File', 'Please enter a URL or select a batch file.')
+            return []
+
+        # Build a command-line representation for preview
+        cmd = ['yt-dlp']
+        cmd += ['-o', ydl_opts.get('outtmpl', '')]
+
+        if 'format' in ydl_opts:
+            cmd += ['-f', ydl_opts['format']]
+
+        if 'noplaylist' in ydl_opts:
+            cmd += ['--no-playlist']
+        elif 'playlist_items' in ydl_opts:
+            cmd += ['--playlist-items', ydl_opts['playlist_items']]
+
+        if 'writesubtitles' in ydl_opts:
+            cmd += ['--write-sub', '--sub-lang', ','.join(ydl_opts.get('subtitleslangs', []))]
+
+        if 'embedthumbnail' in ydl_opts:
+            cmd += ['--embed-thumbnail']
+        if 'addmetadata' in ydl_opts:
+            cmd += ['--add-metadata']
+
+        if 'username' in ydl_opts:
+            cmd += ['--username', ydl_opts['username']]
+        if 'password' in ydl_opts:
+            cmd += ['--password', '***']
+
+        if 'ratelimit' in ydl_opts:
+            cmd += ['--limit-rate', ydl_opts['ratelimit']]
+        if 'retries' in ydl_opts:
+            cmd += ['--retries', str(ydl_opts['retries'])]
+        if 'cookiefile' in ydl_opts:
+            cmd += ['--cookies', ydl_opts['cookiefile']]
+        if 'proxy' in ydl_opts:
+            cmd += ['--proxy', ydl_opts['proxy']]
+
+        if 'merge_output_format' in ydl_opts:
+            cmd += ['--merge-output-format', ydl_opts['merge_output_format']]
+
+        cmd += urls
 
         return cmd
 
     def start_download(self):
-        if self.process and self.process.poll() is None:
+        if self.download_thread and self.download_thread.is_alive():
             messagebox.showinfo('Download running', 'A download is already running.')
             return
-        cmd = self.build_command()
-        if not cmd:
+        ydl_opts, urls = self.build_ytdlp_opts()
+        if not ydl_opts or not urls:
             return
         # Launch in background thread
-        t = threading.Thread(target=self._run_process, args=(cmd,), daemon=True)
-        t.start()
+        self.download_thread = threading.Thread(target=self._run_ytdlp, args=(ydl_opts, urls), daemon=True)
+        self.download_thread.start()
 
     def stop_download(self):
         self.stop_requested = True
-        if self.process and self.process.poll() is None:
-            try:
-                self.process.terminate()
-                log_q.put('\n[USER] Terminate requested.\n')
-            except Exception as e:
-                log_q.put(f'Failed to terminate process: {e}\n')
+        log_q.put('\n[USER] Stop requested. Canceling download...\n')
 
-    def _run_process(self, cmd):
-        # Build environment: ensure ffmpeg is in PATH if provided
-        env = os.environ.copy()
-        ffmpeg_path = self.ffmpeg_path_var.get().strip()
-        if ffmpeg_path and os.path.isfile(ffmpeg_path):
-            ff_dir = os.path.dirname(ffmpeg_path)
-            env['PATH'] = ff_dir + os.pathsep + env.get('PATH', '')
-            log_q.put(f'[INFO] Using ffmpeg at: {ffmpeg_path}\n')
-        else:
-            log_q.put('[WARN] ffmpeg not found or not set; yt-dlp may use internal merging if available.\n')
+    def _ytdlp_logger(self, d):
+        """Custom progress hook for yt-dlp"""
+        if self.stop_requested:
+            raise Exception("Download cancelled by user")
 
-        log_q.put('[CMD] ' + ' '.join(cmd) + '\n')
+        if d['status'] == 'downloading':
+            msg = f"\r[DOWNLOAD] {d.get('_percent_str', 'N/A')} of {d.get('_total_bytes_str', 'N/A')} at {d.get('_speed_str', 'N/A')} ETA {d.get('_eta_str', 'N/A')}"
+            log_q.put(msg)
+        elif d['status'] == 'finished':
+            log_q.put(f"\n[INFO] Downloaded: {d.get('filename', 'unknown')}\n")
+        elif d['status'] == 'error':
+            log_q.put(f"\n[ERROR] Download error\n")
 
+    def _run_ytdlp(self, ydl_opts, urls):
+        """Run yt-dlp using Python API"""
         try:
-            # Use universal_newlines/text mode for easier reading
-            self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, bufsize=1, text=True)
+            ffmpeg_path = self.ffmpeg_path_var.get().strip()
+            if ffmpeg_path and os.path.isfile(ffmpeg_path):
+                log_q.put(f'[INFO] Using ffmpeg at: {ffmpeg_path}\n')
+            else:
+                log_q.put('[WARN] ffmpeg not found or not set; yt-dlp may use internal merging if available.\n')
 
-            for line in self.process.stdout:
-                if self.stop_requested:
-                    break
-                log_q.put(line)
+            # Add progress hook
+            ydl_opts['progress_hooks'] = [self._ytdlp_logger]
 
-            self.process.wait()
-            code = self.process.returncode
-            if code == 0 and not self.stop_requested:
+            # Custom logger to redirect yt-dlp output to our log
+            class YTDLPLogger:
+                def debug(self, msg):
+                    if msg.startswith('[debug] '):
+                        return
+                    log_q.put(f'{msg}\n')
+
+                def info(self, msg):
+                    log_q.put(f'{msg}\n')
+
+                def warning(self, msg):
+                    log_q.put(f'[WARNING] {msg}\n')
+
+                def error(self, msg):
+                    log_q.put(f'[ERROR] {msg}\n')
+
+            ydl_opts['logger'] = YTDLPLogger()
+
+            log_q.put(f'[INFO] Starting download for {len(urls)} URL(s)\n')
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                error_code = ydl.download(urls)
+
+            if error_code == 0 and not self.stop_requested:
                 log_q.put('\n[INFO] yt-dlp finished successfully.\n')
             elif self.stop_requested:
-                log_q.put('\n[INFO] Process stopped by user.\n')
+                log_q.put('\n[INFO] Download stopped by user.\n')
             else:
-                log_q.put(f'\n[ERROR] yt-dlp exited with code {code}.\n')
+                log_q.put(f'\n[ERROR] yt-dlp exited with code {error_code}.\n')
 
-        except FileNotFoundError as e:
-            log_q.put(f'[ERROR] yt-dlp executable not found: {e}\n')
         except Exception as e:
-            log_q.put(f'[ERROR] Exception while running yt-dlp: {e}\n')
+            if self.stop_requested:
+                log_q.put('\n[INFO] Download cancelled by user.\n')
+            else:
+                log_q.put(f'[ERROR] Exception while running yt-dlp: {e}\n')
         finally:
             self.stop_requested = False
-            self.process = None
+            self.download_thread = None
 
 
 if __name__ == '__main__':

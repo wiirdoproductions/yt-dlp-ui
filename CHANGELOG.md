@@ -8,12 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.2] - 2025-11-16
 
 ### Fixed
-- Fixed critical bug where clicking the DOWNLOAD button in compiled .exe spawns multiple instances of the application instead of executing the download
-- Added `multiprocessing.freeze_support()` to properly handle subprocess spawning in PyInstaller frozen executables on Windows
+- **Critical**: Fixed bug where clicking DOWNLOAD button in compiled .exe spawns multiple application instances instead of downloading
+- Completely refactored to use yt-dlp Python API instead of subprocess calls
+- This fix ensures the portable executable works correctly for all users
+
+### Changed
+- Replaced subprocess-based yt-dlp execution with direct Python API integration
+- Improved download progress reporting with real-time updates
+- Enhanced error handling and logging
+- Better integration between GUI and yt-dlp functionality
 
 ### Technical Details
-- The issue occurred because Windows was attempting to spawn the entire GUI application when subprocess.Popen() was called in the frozen executable
-- Solution: Added freeze_support() call in main block to properly initialize multiprocessing support for PyInstaller
+- Root cause: Using `subprocess.Popen([sys.executable, '-m', 'yt_dlp'])` in frozen executables caused `sys.executable` to point to the GUI .exe instead of Python
+- Solution: Migrated to `yt_dlp.YoutubeDL()` Python API for direct module usage
+- Added custom logger class to redirect yt-dlp output to GUI
+- Implemented progress hooks for real-time download status
+- This is the recommended approach for PyInstaller applications per PyInstaller documentation
 
 ## [1.0.1] - 2025-11-16
 

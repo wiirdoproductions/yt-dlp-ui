@@ -3,9 +3,10 @@ yt-dlp UI - Portable Version v1.0.2
 
 WHAT'S NEW in v1.0.2
 --------------------
-CRITICAL BUG FIX: Download button no longer spawns multiple app instances.
+CRITICAL BUG FIX: Download button now works correctly!
 Previous versions had a bug where clicking DOWNLOAD would open new windows
-instead of downloading. This has been fixed. All users should update!
+instead of downloading. This has been completely fixed by refactoring to use
+the yt-dlp Python API directly. All users should update!
 
 
 QUICK START
@@ -68,4 +69,4 @@ This tool is for personal use only. Respect copyright laws
 and the terms of service of websites you download from.
 
 ---
-Made with ❤️ for the community
+Created by Wiirdo with assistance from Claude (Anthropic AI)

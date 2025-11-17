@@ -188,6 +188,12 @@ This application uses the following open-source software:
 
 FFmpeg binaries are included in the portable distribution under the terms of the LGPL 2.1 license. The source code for FFmpeg is available at [ffmpeg.org](https://ffmpeg.org/download.html).
 
+## Authors
+
+**Wiirdo** - *Creator and Developer*
+
+With assistance from Claude (Anthropic AI)
+
 ## Credits
 
 - **yt-dlp**: https://github.com/yt-dlp/yt-dlp
@@ -197,7 +203,7 @@ FFmpeg binaries are included in the portable distribution under the terms of the
 
 ## Disclaimer
 
-This tool is for personal use only. Please respect copyright laws and the terms of service of the websites you download from. The developers are not responsible for any misuse of this software.
+This tool is for personal use only. Please respect copyright laws and the terms of service of the websites you download from. The developer is not responsible for any misuse of this software.
 
 ## Support
 
